@@ -50,7 +50,7 @@ function initDetailFloatingPanel(product) {
   panel.id = 'detail-floating-panel';
   panel.setAttribute('aria-hidden', 'true');
 
-  const imgSrc = product.imagenes && product.imagenes[0] ? `Images/products/${product.imagenes[0]}` : '';
+  const imgSrc = product.imagenes && product.imagenes[0] ? `${getProductImageUrl(product.imagenes[0])}` : '';
 
   panel.innerHTML = `
     <div class="dfp-inner">
@@ -491,7 +491,7 @@ async function handleRouteChange() {
       window.__remoteAttempted = true;
       try {
         // la URL corresponde al raw del branch main
-        await loadProducts('https://raw.githubusercontent.com/HCoreBeat/Buquenque/refs/heads/main/Json/products.json');
+        await loadProducts();
       } catch (e) {
         console.warn('No se pudo cargar productos remotos:', e);
       }
@@ -631,9 +631,7 @@ function pauseCarouselAutoplay() {
 // Cargar evento
 async function loadEvento() {
   try {
-    const response = await fetch("Json/evento.json");
-    if (!response.ok) throw new Error("Error al cargar evento");
-    evento = await response.json();
+    evento = await fetchEventoFromFirebase();
   } catch (error) {
     console.error("Error cargando evento:", error);
     evento = null;
@@ -643,9 +641,7 @@ async function loadEvento() {
 // Cargar información de productos (anuncios/info)
 async function loadInfo() {
   try {
-    const response = await fetch("Json/info.json");
-    if (!response.ok) throw new Error("Error al cargar info");
-    info = await response.json();
+    info = await fetchInfoFromFirebase();
   } catch (error) {
     console.error("Error cargando info:", error);
     info = [];
@@ -661,12 +657,11 @@ function getProductInfo(productId) {
 
 // Cargar productos (local o remoto)
 // si se pasa un URL alternativo, se usará en lugar del archivo local.
-async function loadProducts(sourceUrl = "/Json/products.json") {
+async function loadProducts(sourceUrl = null) {
   try {
-    // Siempre hacer fetch fresco para evitar problemas con cambios en products.json
-    const response = await fetch(sourceUrl);
-    if (!response.ok) throw new Error("Error al cargar productos desde " + sourceUrl);
-    const data = await response.json();
+    // Los productos ahora viven en Firebase Realtime Database (siempre en vivo,
+    // no hace falta cache-busting ni URL de respaldo en GitHub).
+    const data = await fetchProductsFromFirebase();
 
     // Procesar productos para manejar variantes
     const productGroups = {};
@@ -751,15 +746,21 @@ async function loadProducts(sourceUrl = "/Json/products.json") {
     updateCartCount();
     updateCart();
 
-    document
-      .getElementById("close-sidebar")
-      ?.addEventListener("click", toggleSidebar);
-    document
-      .getElementById("menu-toggle")
-      ?.addEventListener("click", toggleSidebar);
-    document
-      .getElementById("overlay")
-      ?.addEventListener("click", toggleSidebar);
+    if (!window.__sidebarListenersBound) {
+      window.__sidebarListenersBound = true;
+      document
+        .getElementById("close-sidebar")
+        ?.addEventListener("click", toggleSidebar);
+      document
+        .getElementById("menu-toggle")
+        ?.addEventListener("click", toggleSidebar);
+      document
+        .getElementById("overlay")
+        ?.addEventListener("click", toggleSidebar);
+    }
+    // Nota: gracias a la comprobación de arriba, aunque loadProducts() se
+    // vuelva a ejecutar por un cambio en tiempo real en Firebase, estos
+    // listeners no se duplican.
   } catch (error) {
     console.error("Error:", error);
     alert("Error al cargar los productos. Por favor recarga la página.");
@@ -1278,7 +1279,7 @@ function renderSearchSuggestions(suggestions) {
 
     if (sugg.type === 'product') {
       const p = sugg.data;
-      imgSrc = p.imagenes?.[0] ? `Images/products/${p.imagenes[0]}` : 'Images/no-image.png';
+      imgSrc = p.imagenes?.[0] ? `${getProductImageUrl(p.imagenes[0])}` : 'Images/no-image.png';
       displayName = p.cleanName || p.nombre || '';
       const price = typeof p.precio === 'number' ? p.precio : 0;
       const isOnSale = p.oferta && p.descuento > 0 && typeof p.descuento === 'number';
@@ -1286,7 +1287,7 @@ function renderSearchSuggestions(suggestions) {
       metaHtml = `${finalPrice} <img src="Images/Zelle.svg" class="currency-icon price-sm" alt="Zelle">`;
     } else if (sugg.type === 'pack') {
       const pack = sugg.data;
-      imgSrc = pack.imagenes?.[0] ? `Images/Packs/${pack.imagenes[0]}` : `Images/pack-placeholder.svg`;
+      imgSrc = pack.imagenes?.[0] ? `${getPackImageUrl(pack.imagenes[0])}` : `Images/pack-placeholder.svg`;
       displayName = pack.nombre || '';
       const price = (typeof pack.precio === 'number' && pack.precio !== 0) ? pack.precio : (typeof pack.precioFinal === 'number' ? pack.precioFinal : 0);
       metaHtml = `${price.toFixed(2)} <img src="Images/Zelle.svg" class="currency-icon price-sm" alt="Zelle">`;
@@ -1739,9 +1740,9 @@ function renderProducts(productsToRender = products) {
                                onclick="changeProductVariant(this, '${
                                  product.baseName
                                }', ${index}, event)">
-                              <img src="Images/products/${
+                              <img src="${getProductImageUrl(
                                 variant.imagenes[0]
-                              }" alt="${
+                              )}" alt="${
                             variant.variantName
                           }" loading="lazy" decoding="async">
                               <span class="variant-tooltip">${
@@ -1796,7 +1797,7 @@ function renderProducts(productsToRender = products) {
                         })()
                       }
                   </div>
-                  <img src="Images/products/${displayProduct.imagenes[0]}" 
+                  <img src="${getProductImageUrl(displayProduct.imagenes[0])}" 
                       class="product-image" 
                       alt="${displayProduct.cleanName}"
                       loading="lazy"
@@ -1926,7 +1927,7 @@ function changeProductVariant(thumbElement, baseName, variantIndex, event) {
   // Actualizar la imagen principal
   productCard.querySelector(
     ".product-image"
-  ).src = `Images/products/${variant.imagenes[0]}`;
+  ).src = `${getProductImageUrl(variant.imagenes[0])}`;
   productCard.querySelector(".product-image").alt = variant.cleanName;
   productCard
     .querySelector(".product-image")
@@ -2130,7 +2131,7 @@ function renderFlashDeals() {
     card.innerHTML = `
       <div class="flash-deal-image-container">
         <span class="flash-deal-badge">Flash</span>
-        <img class="flash-deal-image" src="Images/products/${product.imagenes?.[0] || product.imagen || 'product-placeholder.svg'}" alt="${product.nombre}" loading="lazy" decoding="async" onerror="this.src='Images/product-placeholder.svg'">
+        <img class="flash-deal-image" src="${(product.imagenes?.[0] || product.imagen) ? getProductImageUrl(product.imagenes?.[0] || product.imagen) : 'Images/product-placeholder.svg'}" alt="${product.nombre}" loading="lazy" decoding="async" onerror="this.src='Images/product-placeholder.svg'">
       </div>
       <div class="flash-deal-info">
         <h3 class="flash-deal-title">${product.nombre}</h3>
@@ -2202,8 +2203,8 @@ function renderBestSellers() {
     const name = displayItem.nombre || '';
     const category = isPack ? displayItem.categoria || 'Pack' : displayItem.categoria;
     const imageSrc = isPack
-      ? `Images/Packs/${displayItem.imagenes?.[0] || displayItem.imagen || 'pack-placeholder.svg'}`
-      : `Images/products/${displayItem.imagenes?.[0] || displayItem.imagen || 'product-placeholder.svg'}`;
+      ? ((displayItem.imagenes?.[0] || displayItem.imagen) ? getPackImageUrl(displayItem.imagenes?.[0] || displayItem.imagen) : 'Images/pack-placeholder.svg')
+      : ((displayItem.imagenes?.[0] || displayItem.imagen) ? getProductImageUrl(displayItem.imagenes?.[0] || displayItem.imagen) : 'Images/product-placeholder.svg');
     const priceValue = isPack ? getPackFinalPrice(displayItem) : displayItem.precio;
     const isOnSale = displayItem.oferta && displayItem.descuento > 0;
     const finalPrice = Number(priceValue).toFixed(2);
@@ -2363,7 +2364,7 @@ async function showProductDetail(arg) {
     if ((!info || !info.product) && !window.__remoteAttempted) {
       window.__remoteAttempted = true;
       try {
-        await loadProducts('https://raw.githubusercontent.com/HCoreBeat/Buquenque/refs/heads/main/Json/products.json');
+        await loadProducts();
       } catch (e) {
         console.warn('No se pudo cargar productos remotos:', e);
       }
@@ -2441,7 +2442,7 @@ async function showProductDetail(arg) {
                          onclick="changeDetailVariant('${
                            mainProduct.baseName
                          }', ${index}, event)">
-                        <img src="Images/products/${v.imagenes[0]}" alt="${
+                        <img src="${getProductImageUrl(v.imagenes[0])}" alt="${
                       v.variantName
                     }" loading="lazy" decoding="async">
                         <span class="variant-tooltip">${v.variantName}</span>
@@ -2527,9 +2528,9 @@ async function showProductDetail(arg) {
                             <div class="suggested-image" onclick="showProductDetail('${encodeURIComponent(
                               suggested.nombre
                             )}')">
-                                <img src="Images/products/${
+                                <img src="${getProductImageUrl(
                                   suggested.imagenes[0]
-                                }" alt="${
+                                )}" alt="${
                           suggested.cleanName || suggested.nombre
                         }" loading="lazy" decoding="async">
                             </div>
@@ -2577,9 +2578,9 @@ async function showProductDetail(arg) {
         <div class="detail-container">
             <div class="detail-gallery">
                 <div class="main-image-container">
-                    <img src="Images/products/${
+                    <img src="${getProductImageUrl(
                       product.imagenes[0]
-                    }" class="main-image" alt="${
+                    )}" class="main-image" alt="${
     product.cleanName
   }" id="main-product-image" loading="lazy" decoding="async">
                 </div>
@@ -2927,7 +2928,7 @@ function formatProductDescription(description) {
 function changeMainImage(imgSrc) {
   const mainImg = document.getElementById("main-product-image");
   if (mainImg) {
-    mainImg.src = `Images/products/${imgSrc}`;
+    mainImg.src = `${getProductImageUrl(imgSrc)}`;
     mainImg.style.opacity = "0";
     setTimeout(() => {
       mainImg.style.opacity = "1";
@@ -3013,7 +3014,7 @@ function generateFrequentlyBoughtTogetherHTML(mainProduct, suggestedProducts) {
         ? (product.precio * (1 - product.descuento / 100)).toFixed(2)
         : product.precio.toFixed(2);
       const imageSrc = product?.imagenes?.[0]
-        ? `Images/products/${product.imagenes[0]}`
+        ? `${getProductImageUrl(product.imagenes[0])}`
         : "Images/products/placeholder-product.jpg";
 
       return `
@@ -3221,7 +3222,7 @@ function renderEmptyCartRecommendations() {
       ? (pack.precio * (1 - pack.descuento / 100)).toFixed(2)
       : pack.precio.toFixed(2);
     const description = pack.descripcion ? pack.descripcion : "Ideal para completar tu compra con un pack práctico.";
-    const imagePath = `Images/Packs/${pack.imagen}`;
+    const imagePath = `${getPackImageUrl(pack.imagen)}`;
 
     return `
       <article class="empty-cart-rec-card">
@@ -3316,8 +3317,8 @@ function updateCart() {
 
       // Determinar imagen (packs usan imagen, productos usan imagenes[0])
       const imageSrc = isPack 
-        ? `Images/Packs/${itemData.imagen}`
-        : `Images/products/${itemData.imagenes && itemData.imagenes[0] ? itemData.imagenes[0] : ''}`;
+        ? `${getPackImageUrl(itemData.imagen)}`
+        : `${getProductImageUrl(itemData.imagenes && itemData.imagenes[0] ? itemData.imagenes[0] : '')}`;
       
       const badgeType = isPack ? 'pack' : 'product';
       const availabilityNotice = isAvailable
@@ -3978,9 +3979,7 @@ let packs = [];
  */
 async function loadPacks() {
   try {
-    const response = await fetch("Json/packs.json");
-    if (!response.ok) throw new Error("Error al cargar packs");
-    const data = await response.json();
+    const data = await fetchPacksFromFirebase();
     packs = data.packs || [];
 
     // Preprocesar packs para búsqueda (normalize sin tildes)
@@ -4024,7 +4023,7 @@ function renderCategoryCard() {
     item.onclick = () => showPackDetail(encodeURIComponent(pack.nombre));
     
     // Construir ruta de imagen
-    const imagePath = `Images/Packs/${pack.imagen}`;
+    const imagePath = `${getPackImageUrl(pack.imagen)}`;
     
     item.innerHTML = `
       <div class="category-card-image-container">
@@ -4123,7 +4122,7 @@ function renderPacksDetail() {
     if (pack.nuevo) badges += `<span class="pack-badge nuevo"><i class="fas fa-star-half"></i> Nuevo</span>`;
     
     const caracteristicas = pack.caracteristicas.map(item => `<li class="pack-content-item">${item}</li>`).join('');
-    const imagePath = `Images/Packs/${pack.imagen}`;
+    const imagePath = `${getPackImageUrl(pack.imagen)}`;
     const finalPrice = pack.descuento > 0 
       ? (pack.precio * (1 - pack.descuento / 100)).toFixed(2)
       : pack.precio.toFixed(2);
@@ -4238,7 +4237,7 @@ function showPackDetail(packName, event) {
   const detailContainer = document.getElementById("product-detail");
   if (!detailContainer) return;
   
-  const imagePath = `Images/Packs/${pack.imagen}`;
+  const imagePath = `${getPackImageUrl(pack.imagen)}`;
   
   detailContainer.innerHTML = `
     <div class="detail-container">
@@ -4458,6 +4457,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   // Cargar productos, packs, evento e info en paralelo y esperar todos para que el manejo de rutas tenga los datasets disponibles
   await Promise.all([loadProducts(), loadPacks(), loadEvento(), loadInfo()]);
+
+  // ===== TIEMPO REAL: recargar automáticamente cuando algo cambie en Firebase =====
+  // (nuevo producto, precio editado, imagen cambiada, disponibilidad, packs, evento, info)
+  // No hace falta recargar la página: apenas cambian los datos en la consola de
+  // Firebase, esto vuelve a pedir los datos y re-renderiza todo.
+  if (typeof watchFirebasePath === "function") {
+    watchFirebasePath("products", () => loadProducts());
+    watchFirebasePath("packs", () => loadPacks());
+    watchFirebasePath("evento", () => loadEvento());
+    watchFirebasePath("info", () => loadInfo());
+  }
   
   // Verificar y mostrar automáticamente el modal de evento si es nuevo
   checkAndShowEventModal();

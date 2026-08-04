@@ -5,23 +5,16 @@ const locks = new Map();
 
 // Configurable API base para los endpoints del backend.
 // Default: deployment backend en render
-let API_BASE = 'https://backend-buquenque.onrender.com';
+let API_BASE = 'https://backend-eje1.onrender.com';
 (function detectApiBase() {
   try {
     const host = window.location.hostname;
     const port = window.location.port;
 
     // Si la página se sirve desde el propio backend (misma host), usar rutas relativas
-    if (host === 'backend-buquenque.onrender.com') {
+    if (host === 'https://backend-eje1.onrender.com') {
       API_BASE = '';
       console.info('[rating] Running on backend host; using relative API endpoints');
-      return;
-    }
-
-    // Si estamos usando Live Server (puerto 5500) asumimos backend local en :10000
-    if (port === '5500' || port === '5501') {
-      API_BASE = 'http://localhost:10000';
-      console.info('[rating] Detected Live Server; API base set to', API_BASE);
       return;
     }
 

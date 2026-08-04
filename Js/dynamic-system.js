@@ -446,7 +446,7 @@ function renderRecentProductsSection(productsArray) {
     card.innerHTML = `
       <div class="recent-product-image" 
            onclick="showProductDetail('${encodeURIComponent(displayProduct.nombre)}')">
-        <img src="Images/products/${displayProduct.imagenes[0]}" 
+        <img src="${getProductImageUrl(displayProduct.imagenes[0])}" 
              alt="${displayProduct.nombre}"
              loading="lazy"
              decoding="async">

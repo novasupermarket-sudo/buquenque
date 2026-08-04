@@ -7,10 +7,7 @@ function getRefParameter() {
 // Función para verificar si el afiliado existe en el JSON
 async function verifyAffiliate(ref) {
     try {
-        const response = await fetch('Json/afiliados.json');
-        if (!response.ok) throw new Error('Error al cargar afiliados');
-
-        const data = await response.json();
+        const data = await fetchAfiliadosFromFirebase();
         return data.afiliados.find(affiliate => affiliate.id.toLowerCase() === ref.toLowerCase()) || null;
     } catch (error) {
         console.error('Error al verificar afiliado:', error);

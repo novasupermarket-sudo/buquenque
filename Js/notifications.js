@@ -35,11 +35,7 @@ class NotificationManager {
      */
     async loadNotificationData() {
         try {
-            const response = await fetch('Json/data.json');
-            if (!response.ok) {
-                throw new Error(`Error cargando data.json: ${response.status}`);
-            }
-            this.data = await response.json();
+            this.data = await fetchNotificationBannerFromFirebase();
         } catch (error) {
             console.error('Error cargando datos:', error);
             this.data = null;
@@ -210,4 +206,9 @@ let notificationManager = null;
 document.addEventListener('DOMContentLoaded', () => {
     notificationManager = new NotificationManager();
     notificationManager.init();
+
+    // Tiempo real: si se edita el banner en Firebase, se re-evalúa sin recargar
+    if (typeof watchFirebasePath === 'function') {
+        watchFirebasePath('notificationBanner', () => notificationManager.init());
+    }
 });

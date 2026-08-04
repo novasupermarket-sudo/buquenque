@@ -84,11 +84,7 @@ class MessageNotificationSystem {
      */
     async loadMessageData() {
         try {
-            const response = await fetch('Json/mensaje.json');
-            if (!response.ok) {
-                throw new Error(`Error cargando mensaje.json: ${response.status}`);
-            }
-            const data = await response.json();
+            const data = await fetchMensajesFromFirebase();
             
             // El JSON es un array, tomar el primer elemento
             if (Array.isArray(data) && data.length > 0) {
@@ -476,5 +472,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     messageNotificationSystem.cleanOldStorage();
     
     await messageNotificationSystem.init();
+
+    // Tiempo real: si se edita/activa el mensaje en Firebase, se re-evalúa sin recargar
+    if (typeof watchFirebasePath === 'function') {
+        watchFirebasePath('mensajes', () => messageNotificationSystem.init());
+    }
     
 });

@@ -242,9 +242,8 @@ async function loadPaymentCountryList() {
     if (!container) return;
 
     try {
-        const resp = await fetch('Json/pay.json');
-        if (!resp.ok) throw new Error('No se pudo cargar el listado de países');
-        const data = await resp.json();
+        const data = await fetchPayFromFirebase();
+        if (!data) throw new Error('No se pudo cargar el listado de países');
 
         let html = '<p>Por favor revisa cuidadosamente el listado y confirma que tu país está incluido. Países compatibles con nuestros métodos de pago:</p>';
         if (Array.isArray(data.iban_countries)) {
