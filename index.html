@@ -376,7 +376,7 @@
                     <div class="form-group">
                         <label for="phone"><i class="fas fa-mobile-alt"></i>
                             Tu Número de Teléfono (Para confirmar tu pedido)</label>
-                        <input type="tel" id="phone" name="phone" placeholder="Ej: +1 234 567 8901" required>
+                        <input type="text" id="phone" name="phone" inputmode="numeric" pattern="[0-9]*" autocomplete="tel" placeholder="Ej: 12345678901" maxlength="15" required>
                     </div>
                     <div class="form-group">
                         <label for="address"><i class="fas fa-map-marker-alt"></i>
@@ -396,7 +396,7 @@
                     <div class="form-group">
                         <label for="delivery-phone"><i class="fas fa-phone-alt"></i>
                             Teléfono de Persona que Recibe</label>
-                        <input type="tel" id="delivery-phone" name="delivery-phone" placeholder="Ej: +1 234 567 8901"
+                        <input type="text" id="delivery-phone" name="delivery-phone" inputmode="numeric" pattern="[0-9]*" autocomplete="tel" placeholder="Ej: 12345678901" maxlength="15"
                             required>
                     </div>
                 </div>

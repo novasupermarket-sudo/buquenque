@@ -22,7 +22,21 @@ function initializePaymentSystem() {
         paymentForm.addEventListener('click', handlePaymentSubmitClick);
     }
 
+    restrictNumericPhoneInputs();
     injectPaymentStyles();
+}
+
+function restrictNumericPhoneInputs() {
+    const phoneInputs = document.querySelectorAll('#phone, #delivery-phone');
+
+    phoneInputs.forEach(input => {
+        const sanitizePhoneInput = () => {
+            input.value = input.value.replace(/\D/g, '');
+        };
+
+        input.addEventListener('input', sanitizePhoneInput);
+        input.addEventListener('blur', sanitizePhoneInput);
+    });
 }
 
 function handlePaymentSubmitClick(e) {
@@ -690,6 +704,16 @@ function validateForm() {
         if (!value) {
             throw new Error(`Por favor completa el campo ${field.replace('-', ' ')}`);
         }
+
+        if (field === 'phone' || field === 'delivery-phone') {
+            const onlyNumbers = value.replace(/\D/g, '');
+            if (!/^\d+$/.test(onlyNumbers)) {
+                throw new Error(`El campo ${field.replace('-', ' ')} solo admite números.`);
+            }
+            formData[field] = onlyNumbers;
+            return;
+        }
+
         formData[field] = value;
     });
 

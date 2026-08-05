@@ -162,22 +162,29 @@ function setFlashDealsSectionVisible(visible) {
   }
 }
 
+function getProductAvailabilityState(product) {
+  if (!product) return false;
+
+  if (Object.prototype.hasOwnProperty.call(product, 'disponibilidad')) {
+    return product.disponibilidad !== false;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(product, 'activo')) {
+    return product.activo !== false;
+  }
+
+  return true;
+}
+
 // Helper to determine if a product (or grouped product) should be considered available
 function productIsAvailable(p) {
   if (!p) return false;
-  // direct availability flag
-  if (p.disponibilidad === false) {
-    // if grouped, check variants as a fallback
-    if (p.isGrouped && Array.isArray(p.variants)) {
-      return p.variants.some((v) => v.disponibilidad !== false);
-    }
-    return false;
-  }
-  // if grouped but main item marked available, we still want to ensure at least one variant is available
+
   if (p.isGrouped && Array.isArray(p.variants)) {
-    return p.variants.some((v) => v.disponibilidad !== false);
+    return p.variants.some((v) => getProductAvailabilityState(v));
   }
-  return true;
+
+  return getProductAvailabilityState(p);
 }
 
 function findCurrentCartItemData(cartItem) {
@@ -667,9 +674,15 @@ async function loadProducts(sourceUrl = null) {
     const productGroups = {};
 
     data.products.forEach((product) => {
+      const normalizedProduct = {
+        ...product,
+        disponibilidad: product.disponibilidad ?? (product.activo !== false),
+        activo: typeof product.activo === 'boolean' ? product.activo : (product.disponibilidad !== false),
+      };
+
       // Extraer nombre base y versión
-      const baseName = product.nombre.split("(")[0].trim();
-      const variantName = product.nombre.match(/\((.*?)\)/)?.[1] || "";
+      const baseName = normalizedProduct.nombre.split("(")[0].trim();
+      const variantName = normalizedProduct.nombre.match(/\((.*?)\)/)?.[1] || "";
 
       if (!productGroups[baseName]) {
         productGroups[baseName] = {
@@ -679,8 +692,8 @@ async function loadProducts(sourceUrl = null) {
       }
 
       productGroups[baseName].variants.push({
-        ...product,
-        cleanName: product.nombre.replace(/\(v\d+\)\s*/g, ""),
+        ...normalizedProduct,
+        cleanName: normalizedProduct.nombre.replace(/\(v\d+\)\s*/g, ""),
         variantName: variantName,
       });
     });
@@ -745,6 +758,18 @@ async function loadProducts(sourceUrl = null) {
     renderCategoriesCircle();
     updateCartCount();
     updateCart();
+
+    const detailContainer = document.getElementById('product-detail');
+    if (detailContainer && detailContainer.style.display === 'block' && window.location.pathname.startsWith('/p/')) {
+      const activePath = window.location.pathname.match(/^\/p\/([^\/]+)/)?.[1];
+      if (activePath) {
+        try {
+          await showProductDetail(activePath);
+        } catch (error) {
+          console.warn('No fue posible refrescar el detalle activo tras cambiar Firebase:', error);
+        }
+      }
+    }
 
     if (!window.__sidebarListenersBound) {
       window.__sidebarListenersBound = true;
@@ -2469,7 +2494,8 @@ async function showProductDetail(arg) {
     badges.push(
       '<span class="detail-badge mas-vendido"><i class="fas fa-trophy"></i> Más Vendido</span>'
     );
-  if (!product.disponibilidad)
+  const productIsUnavailable = !getProductAvailabilityState(product);
+  if (productIsUnavailable)
     badges.push(
       '<span class="detail-badge agotado"><i class="fas fa-ban"></i> AGOTADO</span>'
     );
@@ -2478,7 +2504,7 @@ async function showProductDetail(arg) {
   const specs = [
     `<li><strong>Categoría</strong> ${product.categoria}</li>`,
     `<li><strong>Disponibilidad</strong> ${
-      product.disponibilidad ? "En stock" : "Agotado"
+      getProductAvailabilityState(product) ? "En stock" : "Agotado"
     }</li>`,
     ...(product.especificaciones || []).map(
       (spec) => `<li><strong>${spec.key}</strong> ${spec.value}</li>`
@@ -2655,15 +2681,15 @@ async function showProductDetail(arg) {
                 </div>
 
                 <button class="add-to-cart-btn ${
-                  !product.disponibilidad ? "disabled" : ""
+                  !getProductAvailabilityState(product) ? "disabled" : ""
                 }" 
                         onclick="addToCart('${product.nombre}', true, event)"
-                        ${!product.disponibilidad ? "disabled" : ""}>
+                        ${!getProductAvailabilityState(product) ? "disabled" : ""}>
                     <i class="fas fa-${
-                      !product.disponibilidad ? "lock" : "cart-plus"
+                      !getProductAvailabilityState(product) ? "lock" : "cart-plus"
                     }"></i>
                     ${
-                      !product.disponibilidad
+                      !getProductAvailabilityState(product)
                         ? "Producto Agotado"
                         : "Añadir a la cesta"
                     }
