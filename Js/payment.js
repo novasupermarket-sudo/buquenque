@@ -456,10 +456,14 @@ async function processPayment(e) {
             fecha_pedido: new Date().toISOString() // Marca de tiempo del pedido
         };
         // envar las estadstcas de peddo al server de estadstcas
-        await sendStatisticsToBackend(orderPayload);
+        const estadisticaResponse = await sendStatisticsToBackend(orderPayload);
+        const orderNumber = estadisticaResponse?.orderNumber || estadisticaResponse?.numero_orden || null;
+        if (orderNumber) {
+            orderPayload.orderNumber = orderNumber;
+        }
 
         // Envía el payload completo al backend (que lo reenvía a Apps Script)
-        const response = await sendPaymentToServer(orderPayload); // <--- CAMBIO CLAVE AQUÍ
+        const response = await sendPaymentToServer(orderPayload);
 
         if (!response.success) {
             throw new Error(response.message || 'Error en el pedido');
@@ -473,7 +477,7 @@ async function processPayment(e) {
 
         clearCart();
         hidePaymentSection();
-        showOrderConfirmationModal();
+        showOrderConfirmationModal(orderPayload.orderNumber || response?.orderNumber || response?.numero_orden || null);
 
     } catch (error) {
         console.error('Error en processPayment:', error);
@@ -493,13 +497,27 @@ async function processPayment(e) {
     }
 }
 
-function showOrderConfirmationModal() {
+function showOrderConfirmationModal(orderNumber) {
     const modal = document.getElementById('order-confirmation-modal');
     if (!modal) return;
-    
+
+    setConfirmationOrderNumber(orderNumber);
     document.body.style.overflow = 'hidden';
     modal.style.display = 'flex';
     setTimeout(() => modal.classList.add('active'), 10);
+}
+
+function setConfirmationOrderNumber(orderNumber) {
+    const element = document.getElementById('confirmation-order-number');
+    if (!element) return;
+
+    if (orderNumber) {
+        element.textContent = `Número de orden: ${orderNumber}`;
+        element.style.display = 'block';
+    } else {
+        element.textContent = '';
+        element.style.display = 'none';
+    }
 }
 
 // También necesitamos la función para cerrar el modal (ya está en el HTML pero no en el JS)
